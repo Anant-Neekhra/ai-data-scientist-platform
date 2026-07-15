@@ -15,9 +15,15 @@ logger = get_logger(__name__)
 # categorical rather than continuous (e.g. an encoded 0/1/2 label).
 CATEGORICAL_UNIQUE_THRESHOLD = 20
 
-# If a column's unique-value ratio exceeds this, treat it as an
-# identifier rather than a usable feature.
+# If a column's unique-value ratio exceeds this, it's a *candidate*
+# for being an identifier — but cardinality alone is not sufficient
+# proof (continuous numeric features are naturally near-unique too).
 ID_LIKE_UNIQUE_RATIO = 0.95
+
+MIN_ROWS_FOR_ID_CHECK = 20
+
+# Substrings/suffixes that strongly suggest a column is an identifier.
+ID_NAME_HINTS = ("id", "uuid", "guid", "index")
 
 
 class FeatureType(str, Enum):
@@ -37,22 +43,12 @@ class SchemaDetector:
     """Infers per-column feature types and the overall problem type."""
 
     def detect_feature_types(self, df: pd.DataFrame) -> dict[str, FeatureType]:
-        """
-        Infer the semantic type of every column in the DataFrame.
-
-        Args:
-            df: the dataset.
-
-        Returns:
-            Mapping of column name to inferred FeatureType.
-        """
         schema: dict[str, FeatureType] = {}
 
         for col in df.columns:
             series = df[col]
-            unique_ratio = series.nunique(dropna=True) / max(len(series), 1)
 
-            if unique_ratio > ID_LIKE_UNIQUE_RATIO and len(series) > MIN_ROWS_FOR_ID_CHECK:
+            if self._is_id_like(series, col):
                 schema[col] = FeatureType.ID_LIKE
             elif pd.api.types.is_bool_dtype(series):
                 schema[col] = FeatureType.BOOLEAN
@@ -101,14 +97,65 @@ class SchemaDetector:
     @staticmethod
     def _is_parseable_datetime(series: pd.Series) -> bool:
         """Best-effort check: can a string column be parsed as dates?"""
+        import warnings
+
         try:
             sample = series.dropna().head(20)
             if sample.empty:
                 return False
-            pd.to_datetime(sample, errors="raise")
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", UserWarning)
+                pd.to_datetime(sample, errors="raise")
             return True
         except (ValueError, TypeError):
             return False
+        
+    @staticmethod
+    def _looks_like_id_name(col_name: str) -> bool:
+        """Check if a column's *name* suggests it's an identifier."""
+        normalized = col_name.strip().lower().replace("_", "").replace("-", "")
+        return any(hint in normalized for hint in ID_NAME_HINTS)
+
+    @staticmethod
+    def _is_sequential_integers(series: pd.Series) -> bool:
+        """
+        Check if an integer column is a sequential run (1, 2, 3, 4...)
+        when sorted — the structural signature of an auto-increment ID,
+        as opposed to a continuous measurement that merely happens to
+        have many unique values.
+        """
+        if not pd.api.types.is_integer_dtype(series):
+            return False
+        sorted_vals = series.dropna().sort_values().reset_index(drop=True)
+        if len(sorted_vals) < 2:
+            return False
+        diffs = sorted_vals.diff().dropna()
+        return bool((diffs == 1).all())
+
+    def _is_id_like(self, series: pd.Series, col_name: str) -> bool:
+        """
+        Decide if a column is an identifier. Requires BOTH high
+        cardinality AND a corroborating structural/naming signal —
+        cardinality alone is not enough (see salary vs PassengerId).
+        """
+        if len(series) <= MIN_ROWS_FOR_ID_CHECK:
+            return False
+
+        unique_ratio = series.nunique(dropna=True) / len(series)
+        if unique_ratio <= ID_LIKE_UNIQUE_RATIO:
+            return False
+
+        # Floats are never treated as identifiers.
+        if pd.api.types.is_float_dtype(series):
+            return False
+
+        name_suggests_id = self._looks_like_id_name(col_name)
+        structurally_sequential = self._is_sequential_integers(series)
+        is_high_cardinality_text = (
+            not pd.api.types.is_numeric_dtype(series)
+        )
+
+        return name_suggests_id or structurally_sequential or is_high_cardinality_text
 
 
 MIN_ROWS_FOR_ID_CHECK = 20
