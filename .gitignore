@@ -216,3 +216,25 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Virtual environment
+venv/
+
+# Data & artifacts (large, shouldn't be in git)
+datasets/*
+!datasets/.gitkeep
+models/*
+!models/.gitkeep
+artifacts/*
+!artifacts/.gitkeep
+
+# MLflow
+mlruns/
+
+# Environment variables
+.env
+
+# VS Code
+.vscode/
+
+logs/
