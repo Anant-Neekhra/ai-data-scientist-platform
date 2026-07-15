@@ -14,6 +14,7 @@ logger = get_logger(__name__)
 # If a numeric column has <= this many unique values, treat it as
 # categorical rather than continuous (e.g. an encoded 0/1/2 label).
 CATEGORICAL_UNIQUE_THRESHOLD = 20
+CATEGORICAL_UNIQUE_RATIO = 0.05
 
 # If a column's unique-value ratio exceeds this, it's a *candidate*
 # for being an identifier — but cardinality alone is not sufficient
@@ -55,7 +56,9 @@ class SchemaDetector:
             elif pd.api.types.is_datetime64_any_dtype(series):
                 schema[col] = FeatureType.DATETIME
             elif pd.api.types.is_numeric_dtype(series):
-                if series.nunique(dropna=True) <= CATEGORICAL_UNIQUE_THRESHOLD:
+                n_unique = series.nunique(dropna=True)
+                unique_ratio = n_unique / len(series) if len(series) else 0.0
+                if n_unique <= CATEGORICAL_UNIQUE_THRESHOLD or unique_ratio <= CATEGORICAL_UNIQUE_RATIO:
                     schema[col] = FeatureType.CATEGORICAL
                 else:
                     schema[col] = FeatureType.NUMERICAL

@@ -11,14 +11,26 @@ from ml_pipeline.data.schema_detector import FeatureType
 
 @pytest.fixture
 def sample_df() -> pd.DataFrame:
+    n = 30
     return pd.DataFrame(
         {
             "age": [25, 30, 35, np.nan, 40, 45, 50, 22, 28, 33] * 3,
-            "salary": [30000, 35000, 40000, 45000, 50000, 55000, 60000, 32000, 38000, 42000] * 3,
+            "salary": [30000 + i * 733 for i in range(n)],  # 30 distinct values
             "city": ["Delhi", "Mumbai", "Delhi", "Pune", "Mumbai"] * 6,
         }
     )
 
+@pytest.fixture
+def duplicated_df() -> pd.DataFrame:
+    """A small dataset with exact, verifiable duplicate rows."""
+    base = pd.DataFrame(
+        {
+            "age": [25, 30, 35],
+            "salary": [30000, 35000, 40000],
+            "city": ["Delhi", "Mumbai", "Pune"],
+        }
+    )
+    return pd.concat([base] * 3, ignore_index=True)  # 9 rows, 3 unique -> 6 dupes
 
 def test_dataset_stats_shape(sample_df):
     stats = StatisticsEngine().compute(sample_df)
@@ -51,11 +63,10 @@ def test_missing_value_report(sample_df):
     assert report.total_missing_cells == 3
 
 
-def test_duplicate_report_detects_repeats(sample_df):
-    # sample_df repeats the same 10 rows 3 times -> heavy duplication
-    report = DataQualityAnalyzer().analyze_duplicates(sample_df)
-    assert report.duplicate_count == 20  # 30 rows, 10 unique -> 20 dupes
-    assert len(report.duplicate_row_indices) == 20
+def test_duplicate_report_detects_repeats(duplicated_df):
+    report = DataQualityAnalyzer().analyze_duplicates(duplicated_df)
+    assert report.duplicate_count == 6  # 9 rows, 3 unique -> 6 dupes
+    assert len(report.duplicate_row_indices) == 6
 
 
 def test_high_risk_missing_column_flagged():
