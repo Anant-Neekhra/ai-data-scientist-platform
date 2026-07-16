@@ -9,8 +9,8 @@ Python · Pandas · Scikit-learn · XGBoost · LightGBM · CatBoost · TensorFlo
 
 ## Status
 - [x] Project scaffolding, config, logging
-- [ ] Data upload & validation
-- [ ] EDA engine
+- [x] Data upload & validation
+- [x] EDA engine
 - [ ] Preprocessing pipeline
 - [ ] Model training & comparison
 - [ ] Hyperparameter tuning
