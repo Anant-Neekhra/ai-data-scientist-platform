@@ -5,6 +5,7 @@ Import get_logger(__name__) in any module that needs to log.
 
 import logging
 import sys
+from logging.handlers import RotatingFileHandler
 from config.settings import LOGS_DIR, LOG_LEVEL
 
 
@@ -36,11 +37,11 @@ def get_logger(name: str) -> logging.Logger:
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(formatter)
 
-    file_handler = logging.FileHandler(
-    LOGS_DIR / "app.log",
-    maxBytes=5 * 1024 * 1024,  # 5 MB
-    backupCount=3,
-    encoding="utf-8",
+    file_handler = RotatingFileHandler(
+        LOGS_DIR / "app.log",
+        maxBytes=5 * 1024 * 1024,  # 5 MB
+        backupCount=3,
+        encoding="utf-8",
     )
     file_handler.setFormatter(formatter)
 

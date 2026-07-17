@@ -137,9 +137,18 @@ class SchemaDetector:
 
     def _is_id_like(self, series: pd.Series, col_name: str) -> bool:
         """
-        Decide if a column is an identifier. Requires BOTH high
-        cardinality AND a corroborating structural/naming signal —
-        cardinality alone is not enough (see salary vs PassengerId).
+        Decide if a column is an identifier. Requires high cardinality
+        AND a corroborating signal (name hint, sequential structure, or
+        being non-numeric text) — cardinality alone is not enough.
+
+        Known limitation: a genuinely categorical high-cardinality text
+        column with zero repeated values in the current sample (e.g. a
+        small dataset where a region code happens to be unique per row)
+        is structurally indistinguishable from a true identifier, and
+        will be misclassified as id_like. This is why schema detection
+        results are meant to be user-overridable in the frontend rather
+        than treated as final — no purely statistical rule can resolve
+        this ambiguity from the data alone.
         """
         if len(series) <= MIN_ROWS_FOR_ID_CHECK:
             return False
