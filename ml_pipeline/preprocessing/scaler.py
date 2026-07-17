@@ -28,6 +28,7 @@ class FeatureScaler(BaseEstimator, TransformerMixin):
         self._schema_detector = SchemaDetector()
         self._scaler = StandardScaler() if method == "standard" else MinMaxScaler()
         self._numerical_cols: list[str] = []
+        self._is_fitted = False
 
     def fit(self, X: pd.DataFrame, y: pd.Series | None = None) -> "FeatureScaler":
         """Learn scaling parameters from X. Call ONLY on training data."""
@@ -37,6 +38,7 @@ class FeatureScaler(BaseEstimator, TransformerMixin):
         ]
         if self._numerical_cols:
             self._scaler.fit(X[self._numerical_cols])
+        self._is_fitted = True
         logger.info(f"Scaler ({self.method}) fitted on columns: {self._numerical_cols}")
         return self
 
@@ -49,3 +51,6 @@ class FeatureScaler(BaseEstimator, TransformerMixin):
         scaled_values = self._scaler.transform(X[self._numerical_cols])
         X[self._numerical_cols] = scaled_values
         return X
+    
+    def __sklearn_is_fitted__(self) -> bool:
+        return self._is_fitted

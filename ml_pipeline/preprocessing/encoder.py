@@ -31,6 +31,7 @@ class CategoricalEncoder(BaseEstimator, TransformerMixin):
         self._frequency_maps: dict[str, dict[str, float]] = {}
         self._onehot_columns: list[str] = []
         self._frequency_columns: list[str] = []
+        self._is_fitted = False
 
     def fit(self, X: pd.DataFrame, y: pd.Series | None = None) -> "CategoricalEncoder":
         """
@@ -62,6 +63,7 @@ class CategoricalEncoder(BaseEstimator, TransformerMixin):
                 self._frequency_maps[col] = freq_map
                 self._frequency_columns.append(col)
 
+        self._is_fitted = True
         logger.info(
             f"Encoder fitted: one-hot={self._onehot_columns}, "
             f"frequency={self._frequency_columns}"
@@ -72,7 +74,7 @@ class CategoricalEncoder(BaseEstimator, TransformerMixin):
         """Apply learned encodings. Unseen categories degrade gracefully:
         one-hot columns become all-zero, frequency-encoded values become 0.0.
         """
-        if not self._onehot_columns and not self._frequency_columns:
+        if not self._is_fitted:
             raise RuntimeError("Encoder has not been fitted yet. Call fit() first.")
 
         encoded_cols = self._onehot_columns + self._frequency_columns
@@ -95,3 +97,6 @@ class CategoricalEncoder(BaseEstimator, TransformerMixin):
             output_frames.append(freq_series)
 
         return pd.concat(output_frames, axis=1)
+    
+    def __sklearn_is_fitted__(self) -> bool:
+        return self._is_fitted

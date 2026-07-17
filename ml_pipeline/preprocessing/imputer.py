@@ -27,12 +27,9 @@ class MissingValueImputer(BaseEstimator, TransformerMixin):
         self.schema = schema
         self._schema_detector = SchemaDetector()
         self._fill_values: dict[str, Any] = {}
+        self._is_fitted = False
 
     def fit(self, X: pd.DataFrame, y: pd.Series | None = None) -> "MissingValueImputer":
-        """
-        Compute fill values from X. Call this ONLY on training data —
-        transform() will reuse these exact values on any other split.
-        """
         schema = self.schema or self._schema_detector.detect_feature_types(X)
         self._fill_values = {}
 
@@ -43,18 +40,13 @@ class MissingValueImputer(BaseEstimator, TransformerMixin):
             elif ftype in (FeatureType.CATEGORICAL, FeatureType.BOOLEAN):
                 mode = X[col].mode(dropna=True)
                 self._fill_values[col] = mode.iloc[0] if not mode.empty else "missing"
-            # DATETIME and ID_LIKE columns are intentionally skipped.
 
+        self._is_fitted = True
         logger.info(f"Imputer fitted on {len(self._fill_values)} columns")
         return self
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
-        """
-        Apply the fill values learned during fit(). Safe to call on
-        training data, test data, or brand-new prediction data — it
-        never recomputes anything from X itself.
-        """
-        if not self._fill_values:
+        if not self._is_fitted:
             raise RuntimeError("Imputer has not been fitted yet. Call fit() first.")
 
         X = X.copy()
@@ -62,3 +54,6 @@ class MissingValueImputer(BaseEstimator, TransformerMixin):
             if col in X.columns:
                 X[col] = X[col].fillna(fill_value)
         return X
+
+    def __sklearn_is_fitted__(self) -> bool:
+        return self._is_fitted

@@ -41,6 +41,7 @@ class FeatureGenerator(BaseEstimator, TransformerMixin):
         self._schema_detector = SchemaDetector()
         self._numeric_cols_for_interactions: list[str] = []
         self._datetime_cols: list[str] = []
+        self._is_fitted = False
 
     def fit(self, X: pd.DataFrame, y: pd.Series | None = None) -> "FeatureGenerator":
         schema = self.schema or self._schema_detector.detect_feature_types(X)
@@ -55,6 +56,7 @@ class FeatureGenerator(BaseEstimator, TransformerMixin):
         )
         self._datetime_cols = [c for c, t in schema.items() if t == FeatureType.DATETIME]
 
+        self._is_fitted = True
         logger.info(
             f"FeatureGenerator fitted: interactions from "
             f"{self._numeric_cols_for_interactions}, datetime decomposition "
@@ -80,3 +82,6 @@ class FeatureGenerator(BaseEstimator, TransformerMixin):
             X = X.drop(columns=[col])  # raw datetime isn't directly usable by most models
 
         return X
+    
+    def __sklearn_is_fitted__(self) -> bool:
+        return self._is_fitted
