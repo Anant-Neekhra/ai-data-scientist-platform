@@ -15,6 +15,7 @@ from ml_pipeline.preprocessing.imputer import MissingValueImputer
 from ml_pipeline.feature_engineering.generator import FeatureGenerator
 from ml_pipeline.preprocessing.encoder import CategoricalEncoder
 from ml_pipeline.preprocessing.scaler import FeatureScaler
+from ml_pipeline.preprocessing.column_dropper import ColumnDropper
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -51,6 +52,7 @@ def build_preprocessing_pipeline(
 
     pipeline = Pipeline(
         steps=[
+            ("column_dropper", ColumnDropper(schema=schema)),
             ("imputer", MissingValueImputer(schema=schema)),
             ("feature_engineer", FeatureGenerator(schema=schema)),
             ("encoder", CategoricalEncoder(schema=schema)),
