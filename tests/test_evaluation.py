@@ -77,7 +77,13 @@ def test_feature_importance_extracted_for_tree_model():
 
 def test_feature_importance_extracted_for_linear_model():
     n = 40
-    X = pd.DataFrame({"age": [22 + (i * 3) % 40 for i in range(n)]})
+    # Note: previously used (i * 3) % 40, but 3 and 40 are coprime, so
+    # that expression secretly produced a perfect permutation of 40
+    # consecutive integers -- sorted, they form a run with diffs of 1,
+    # which _is_sequential_integers() correctly (if unintuitively)
+    # flags as id_like. Using a non-coprime step avoids that trap and
+    # gives more realistic, repeating numeric data.
+    X = pd.DataFrame({"age": [22 + (i * 4) % 30 for i in range(n)]})
     y = pd.Series([1 if v > 35 else 0 for v in X["age"]])
 
     pipeline = build_preprocessing_pipeline(X)
