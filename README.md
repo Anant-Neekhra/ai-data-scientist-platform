@@ -11,11 +11,11 @@ Python · Pandas · Scikit-learn · XGBoost · LightGBM · CatBoost · TensorFlo
 - [x] Project scaffolding, config, logging
 - [x] Data upload & validation
 - [x] EDA engine
-- [ ] Preprocessing pipeline
-- [ ] Model training & comparison
-- [ ] Hyperparameter tuning
-- [ ] Evaluation dashboard
-- [ ] Explainability (SHAP)
+- [x] Preprocessing pipeline
+- [x] Model training & comparison
+- [x] Hyperparameter tuning
+- [x] Evaluation dashboard
+- [x] Explainability (SHAP)
 - [ ] Model registry
 - [ ] Prediction service
 - [ ] MLflow integration
