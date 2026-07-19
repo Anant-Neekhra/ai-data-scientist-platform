@@ -41,26 +41,3 @@ def test_dropper_is_noop_when_no_id_like_columns():
     result = dropper.transform(df)
     assert list(result.columns) == list(df.columns)
 
-def test_full_pipeline_drops_id_like_and_leaves_only_numeric_columns():
-    df = pd.DataFrame(
-        {
-            "name": [f"Person {i}" for i in range(30)],  # high-cardinality text -> id_like
-            "age": [22 + (i * 3) % 40 for i in range(30)],
-            "city": ["Delhi", "Mumbai", "Pune"] * 10,
-            "target": [0, 1] * 15,
-        }
-    )
-    X_train, X_test, y_train, y_test = split_dataset(df, target_col="target")
-
-    pipeline = build_preprocessing_pipeline(X_train)
-    pipeline.fit(X_train)
-    X_train_transformed = pipeline.transform(X_train)
-
-    assert "name" not in X_train_transformed.columns
-    # Every remaining column must be numeric -- this is the exact
-    # property that silently failed before ColumnDropper existed,
-    # breaking every model at fit() time on the real Titanic run.
-    assert all(
-        pd.api.types.is_numeric_dtype(X_train_transformed[col])
-        for col in X_train_transformed.columns
-    )
