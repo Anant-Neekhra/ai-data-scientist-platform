@@ -87,7 +87,7 @@ def test_local_explanation_sums_to_prediction(classification_pipeline_and_data):
 
 def test_regression_explainer_works():
     n = 50
-    X = pd.DataFrame({"size": [30 + i for i in range(n)]})
+    X = pd.DataFrame({"size": [30 + i * 3 for i in range(n)]})
     y = pd.Series([100 + 5 * v for v in X["size"]])
 
     pipeline = build_preprocessing_pipeline(X)

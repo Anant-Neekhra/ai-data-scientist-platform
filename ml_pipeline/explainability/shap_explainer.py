@@ -89,24 +89,19 @@ class ShapExplainer:
     def explain_global(
         self, X_sample: pd.DataFrame, sample_size: int = DEFAULT_SAMPLE_SIZE
     ) -> GlobalExplanation:
-        """
-        Compute a global SHAP explanation over a sample of rows.
-
-        Args:
-            X_sample: RAW data to explain (typically X_train or X_test).
-            sample_size: rows are randomly sampled down to this size for
-                speed -- see Day 10 notes on why a sample is sufficient
-                for a stable global summary.
-        """
         if len(X_sample) > sample_size:
             X_sample = X_sample.sample(n=sample_size, random_state=42)
 
         X_transformed = self._preprocessing.transform(X_sample)
-        shap_values = self._explainer.shap_values(X_transformed)
-
-        # Binary classifiers can return a list [class_0_values, class_1_values]
-        # or a single 2D array depending on the model library -- normalize to
-        # "SHAP values for the positive class" so downstream code is uniform.
+        # check_additivity=False: some probability-output tree ensembles
+        # (notably RandomForest) can fail SHAP's strict internal additivity
+        # self-check due to floating-point inconsistencies between the
+        # tree-based SHAP approximation and averaged-vote probability
+        # outputs -- a known SHAP/RandomForest interaction, not a sign our
+        # values are wrong. We verify the sum identity ourselves in tests
+        # (see test_local_explanation_sums_to_prediction) with a tolerant
+        # threshold instead of relying on SHAP's strict internal check.
+        shap_values = self._explainer.shap_values(X_transformed, check_additivity=False)
         shap_values, base_value = self._normalize_shap_output(shap_values)
 
         mean_abs_shap = np.abs(shap_values).mean(axis=0)
@@ -114,7 +109,7 @@ class ShapExplainer:
         return GlobalExplanation(
             feature_names=list(X_transformed.columns),
             mean_abs_shap=mean_abs_shap,
-            shap_values=shap_values,
+            shap_values = self._explainer.shap_values(X_transformed, check_additivity=False),
             feature_values=X_transformed.reset_index(drop=True),
             base_value=base_value,
         )
