@@ -238,3 +238,6 @@ mlruns/
 .vscode/
 
 logs/
+
+# CatBoost training logs
+catboost_info/
