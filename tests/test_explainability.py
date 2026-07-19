@@ -97,3 +97,32 @@ def test_regression_explainer_works():
     explainer = ShapExplainer(pipeline, X)
     explanation = explainer.explain_global(X, sample_size=25)
     assert explanation.shap_values.shape[0] == 25
+
+def test_local_explanation_sums_to_prediction_catboost():
+    """Same guarantee as test_local_explanation_sums_to_prediction, but
+    against CatBoost specifically -- this is the model type that
+    exposed a log-odds vs. probability unit mismatch in practice
+    (see Day 10/11 notes), which RandomForest's test alone did not
+    catch since RandomForest happens to output probability space
+    by default regardless of the model_output setting."""
+    from catboost import CatBoostClassifier
+
+    n = 60
+    X = pd.DataFrame(
+        {
+            "age": [22 + (i * 4) % 50 for i in range(n)],
+            "city": ["Delhi", "Mumbai", "Pune"] * (n // 3),
+        }
+    )
+    y = pd.Series([1 if v > 40 else 0 for v in X["age"]])
+
+    pipeline = build_preprocessing_pipeline(X)
+    pipeline.steps.append(("model", CatBoostClassifier(iterations=50, verbose=0, random_state=42)))
+    pipeline.fit(X, y)
+
+    explainer = ShapExplainer(pipeline, X)
+    row = X.iloc[[0]]
+    explanation = explainer.explain_local(row)
+
+    actual_proba = pipeline.predict_proba(row)[0, 1]
+    assert explanation.predicted_value == pytest.approx(actual_proba, abs=0.02)
