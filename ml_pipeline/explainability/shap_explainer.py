@@ -83,8 +83,21 @@ class ShapExplainer:
         # TreeExplainer needs a background dataset in the same numeric,
         # post-preprocessing shape the model was actually trained on.
         X_ref_transformed = self._preprocessing.transform(X_reference)
-        self._explainer = shap.TreeExplainer(self._model, X_ref_transformed)
-        logger.info(f"ShapExplainer initialized for {model_class_name}")
+
+        # model_output="probability" only makes sense for classifiers --
+        # regressors have no probability space to convert into, and SHAP
+        # raises NotImplementedError if asked to. Detect via predict_proba,
+        # the standard sklearn signal for "this is a classifier."
+        is_classifier = hasattr(self._model, "predict_proba")
+        model_output = "probability" if is_classifier else "raw"
+
+        self._explainer = shap.TreeExplainer(
+            self._model, X_ref_transformed, model_output=model_output
+        )
+        logger.info(
+            f"ShapExplainer initialized for {model_class_name} "
+            f"(model_output='{model_output}')"
+        )
 
     def explain_global(
         self, X_sample: pd.DataFrame, sample_size: int = DEFAULT_SAMPLE_SIZE
