@@ -73,7 +73,7 @@ def get_candidate_models(problem_type: ProblemType) -> dict:
     """
     if problem_type == ProblemType.CLASSIFICATION:
         candidates: dict = {
-            "logistic_regression": LogisticRegression(max_iter=1000, random_state=RANDOM_STATE),
+            "logistic_regression": LogisticRegression(max_iter=2000, random_state=RANDOM_STATE),
             "random_forest": RandomForestClassifier(n_estimators=200, random_state=RANDOM_STATE),
             "xgboost": XGBClassifier(random_state=RANDOM_STATE, eval_metric="logloss", verbosity=0),
             "lightgbm": LGBMClassifier(random_state=RANDOM_STATE, verbose=-1),
