@@ -25,13 +25,18 @@ logger = get_logger(__name__)
 def _sanitize_dataset_name(name: str) -> str:
     """
     Turn an arbitrary dataset filename into a filesystem-safe folder
-    name. Strips the extension, lowercases, replaces anything that
-    isn't alphanumeric/underscore/hyphen with underscores.
+    name. Strips a trailing extension via plain string splitting
+    (NOT pathlib.Path, which would treat any '/' in the name as a
+    real path separator and silently discard everything before it --
+    exactly the kind of untrusted input this function exists to
+    handle safely). Lowercases, replaces anything that isn't
+    alphanumeric/underscore/hyphen with underscores.
     """
-    stem = Path(name).stem
+    # Strip a trailing extension (last ".something") without
+    # interpreting the string as a filesystem path.
+    stem = re.sub(r"\.[^.]+$", "", name)
     safe = re.sub(r"[^a-zA-Z0-9_-]", "_", stem)
     return safe.lower()
-
 
 class ModelRegistry:
     """Saves, loads, and tracks versioned models, organized per dataset."""
