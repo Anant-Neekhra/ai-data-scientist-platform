@@ -6,6 +6,7 @@ FastAPI application entrypoint. Run with:
 from fastapi import FastAPI
 
 from backend.routes import prediction
+from backend.routes import prediction, dataset, training
 from utils.logger import get_logger
 
 logger = get_logger(__name__)

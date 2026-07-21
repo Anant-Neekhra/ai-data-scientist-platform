@@ -16,6 +16,7 @@ from config.settings import RANDOM_STATE
 from ml_pipeline.data.schema_detector import ProblemType
 from ml_pipeline.preprocessing.pipeline_builder import build_preprocessing_pipeline
 from ml_pipeline.training.model_factory import get_candidate_models
+from ml_pipeline.tracking.mlflow_tracker import MLflowTracker
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -53,30 +54,12 @@ class ModelTrainer:
         y_train: pd.Series,
         problem_type: ProblemType,
         models: dict | None = None,
+        tracker: MLflowTracker | None = None,
+        dataset_name: str = "unknown",
     ) -> list[ModelResult]:
-        """
-        Cross-validate every candidate model and return their scores.
-
-        Args:
-            X_train: RAW (not preprocessed) training features. Passing
-                already-transformed data here would reintroduce the
-                cross-fold leakage this method is designed to prevent.
-            y_train: training target.
-            problem_type: classification or regression.
-            models: optional override of the candidate dict, injected
-                rather than always calling get_candidate_models() --
-                this makes the method testable with a small, fast
-                model set without needing to monkeypatch anything.
-
-        Returns:
-            List of ModelResult, one per model that trained successfully.
-            Models that raise during cross-validation are logged and
-            skipped rather than aborting the whole comparison.
-        """
         candidates = models if models is not None else get_candidate_models(problem_type)
         scoring = (
-            CLASSIFICATION_SCORING
-            if problem_type == ProblemType.CLASSIFICATION
+            CLASSIFICATION_SCORING if problem_type == ProblemType.CLASSIFICATION
             else REGRESSION_SCORING
         )
         cv = (
@@ -87,20 +70,13 @@ class ModelTrainer:
 
         results: list[ModelResult] = []
         for name, model in candidates.items():
-            # Preprocessing + model as ONE pipeline; cross_validate gets
-            # RAW X_train so preprocessing is refit per fold, not once
-            # up front. See leakage discussion above.
             full_pipeline = build_preprocessing_pipeline(X_train)
             full_pipeline.steps.append(("model", model))
 
             start = time.time()
             try:
                 cv_results = cross_validate(
-                    full_pipeline,
-                    X_train,
-                    y_train,
-                    cv=cv,
-                    scoring=scoring,
+                    full_pipeline, X_train, y_train, cv=cv, scoring=scoring,
                     return_train_score=False,
                 )
             except Exception as e:
@@ -111,13 +87,14 @@ class ModelTrainer:
             mean_scores = {m: float(np.mean(cv_results[f"test_{m}"])) for m in scoring}
             std_scores = {m: float(np.std(cv_results[f"test_{m}"])) for m in scoring}
 
+            if tracker is not None:
+                with tracker.start_run(run_name=f"{dataset_name}_{name}"):
+                    tracker.log_tags({"dataset": dataset_name, "model_name": name, "phase": "comparison"})
+                    tracker.log_params({"model_name": name, "cv_folds": self.cv_folds})
+                    tracker.log_metrics(mean_scores)
+
             results.append(
-                ModelResult(
-                    model_name=name,
-                    mean_scores=mean_scores,
-                    std_scores=std_scores,
-                    fit_time_seconds=elapsed,
-                )
+                ModelResult(model_name=name, mean_scores=mean_scores, std_scores=std_scores, fit_time_seconds=elapsed)
             )
             logger.info(f"{name}: {mean_scores} (fit_time={elapsed}s)")
 

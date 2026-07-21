@@ -26,3 +26,22 @@ class PredictionResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     message: str
+
+class UploadResponse(BaseModel):
+    dataset_name: str
+    n_rows: int
+    n_columns: int
+    validation_errors: list[str]
+    validation_warnings: list[str]
+
+
+class TrainRequest(BaseModel):
+    dataset_name: str
+    target_column: str
+    cv_folds: int = Field(5, ge=2, le=10)
+
+
+class TrainResponse(BaseModel):
+    best_model_name: str
+    leaderboard: list[dict]
+    model_version: int
