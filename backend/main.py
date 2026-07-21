@@ -17,6 +17,8 @@ app = FastAPI(
     version="0.1.0",
 )
 
+app.include_router(dataset.router, prefix="/api/v1", tags=["dataset"])
+app.include_router(training.router, prefix="/api/v1", tags=["training"])
 app.include_router(prediction.router, prefix="/api/v1", tags=["prediction"])
 
 
