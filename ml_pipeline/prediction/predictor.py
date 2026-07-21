@@ -42,8 +42,9 @@ class PredictionService:
         Check incoming columns against what the model was trained on.
         Missing columns are a hard error -- the pipeline has no way to
         guess a value for a column it never saw at all. Extra columns
-        are just ignored (a superset is harmless; the pipeline only
-        reads the columns it knows about).
+        are tolerated here (see _select_known_columns, which is what
+        actually makes them harmless downstream -- this method only
+        checks for the fatal case).
         """
         missing = set(metadata.feature_columns) - set(df.columns)
         if missing:
@@ -53,15 +54,27 @@ class PredictionService:
                 f"{metadata.feature_columns}"
             )
 
+    def _select_known_columns(self, df: pd.DataFrame, metadata: ModelMetadata) -> pd.DataFrame:
+        """
+        Restrict the input to exactly the columns the pipeline was
+        trained on, in that order. This is what actually makes "extra
+        columns are tolerated" true -- without it, an unexpected extra
+        column rides untouched through every preprocessing step (none
+        of them know about a column they never saw at fit time) and
+        reaches the final model, which raises its own strict feature-
+        name check. Validating for missing columns alone is not
+        sufficient; the DataFrame handed to the pipeline must actually
+        be narrowed down first.
+        """
+        return df[metadata.feature_columns]
+
     def predict_single(
         self, dataset_name: str, row: dict, version: int | None = None
     ) -> PredictionResult:
-        """
-        Predict on a single row, given as a dict of {column_name: value}.
-        """
         pipeline, metadata = self._load(dataset_name, version)
         df = pd.DataFrame([row])
         self._validate_columns(df, metadata)
+        df = self._select_known_columns(df, metadata)
 
         prediction = pipeline.predict(df)
         probability = None
@@ -79,21 +92,20 @@ class PredictionService:
     def predict_batch(
         self, dataset_name: str, df: pd.DataFrame, version: int | None = None
     ) -> pd.DataFrame:
-        """
-        Predict on a batch of rows. Returns the ORIGINAL DataFrame with
-        prediction (and probability, if available) columns appended --
-        so the user gets their data back with predictions attached,
-        ready to download, rather than a bare array they'd have to
-        realign themselves.
-        """
         pipeline, metadata = self._load(dataset_name, version)
         self._validate_columns(df, metadata)
 
+        # Keep the ORIGINAL df (with any extra columns) for the final
+        # output the user downloads -- they may want those extra
+        # columns preserved in the result even though the model never
+        # used them. Only the pipeline-facing copy gets narrowed.
+        pipeline_input = self._select_known_columns(df, metadata)
+
         result_df = df.copy()
-        result_df["prediction"] = pipeline.predict(df)
+        result_df["prediction"] = pipeline.predict(pipeline_input)
 
         if hasattr(pipeline, "predict_proba"):
-            result_df["prediction_probability"] = pipeline.predict_proba(df)[:, 1]
+            result_df["prediction_probability"] = pipeline.predict_proba(pipeline_input)[:, 1]
 
         logger.info(
             f"Batch prediction served for {len(df)} rows using "
