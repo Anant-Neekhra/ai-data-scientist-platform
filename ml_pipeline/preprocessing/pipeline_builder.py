@@ -27,24 +27,22 @@ def build_preprocessing_pipeline(
     schema_override: dict[str, FeatureType] | None = None,
 ) -> Pipeline:
     """
-    Build a preprocessing Pipeline configured for this dataset's schema.
-
-    Args:
-        df: a representative sample of the data (typically X_train)
-            used to auto-detect the schema, UNLESS schema_override is
-            provided.
-        scaling_method: 'standard' or 'minmax'.
-        schema_override: optional user-corrected schema (e.g. from the
-            Streamlit upload page's editable schema table). When
-            provided, this is used INSTEAD of auto-detection -- the
-            whole reason every transformer accepts an optional schema
-            parameter (since Day 5) is to make this override possible
-            without touching any transformer's internals.
-
-    Returns:
-        An unfitted sklearn Pipeline.
+    ...(existing docstring)...
     """
-    schema = schema_override or SchemaDetector().detect_feature_types(df)
+    if schema_override:
+        # Restrict the override to columns that actually exist in df.
+        # This matters because schema_override is typically built by
+        # the frontend from detecting schema on the FULL uploaded
+        # dataset (before the target column is split off) -- so it
+        # can legitimately contain the target column's own entry.
+        # df here is X_train, which never contains the target (already
+        # dropped by split_dataset), so any override key not present
+        # in df -- most commonly the target itself -- is silently and
+        # safely ignored rather than being handed to transformers that
+        # would then try to operate on a column that doesn't exist.
+        schema = {col: ftype for col, ftype in schema_override.items() if col in df.columns}
+    else:
+        schema = SchemaDetector().detect_feature_types(df)
 
     pipeline = Pipeline(
         steps=[
