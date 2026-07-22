@@ -20,22 +20,7 @@ def split_dataset(
     df: pd.DataFrame, target_col: str
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
     """
-    Split a dataset into train/test features and targets.
-
-    For classification problems, stratifies on the target so both
-    splits preserve the original class proportions -- important
-    because a random split could otherwise leave a rare class
-    severely underrepresented (or entirely absent) in the test set,
-    making evaluation on that class meaningless. Regression targets
-    can't be stratified this way (they're continuous, not classes),
-    so a plain random split is used instead.
-
-    Args:
-        df: the full, already-imputed-and-clean-of-target-nulls dataset.
-        target_col: name of the target column.
-
-    Returns:
-        (X_train, X_test, y_train, y_test)
+    ...(existing docstring)...
     """
     X = df.drop(columns=[target_col])
     y = df[target_col]
@@ -43,12 +28,25 @@ def split_dataset(
     problem_type = SchemaDetector().detect_problem_type(df, target_col)
     stratify = y if problem_type == ProblemType.CLASSIFICATION else None
 
+    # Stratification requires every class to have at least 2 members
+    # (one for train, one for test). A user is free to pick ANY column
+    # as the target through the frontend, including one with rare
+    # singleton classes (e.g. a car brand that appears exactly once) --
+    # that's a legitimate, foreseeable situation, not a data error.
+    # Degrade to a plain (non-stratified) split rather than crash.
+    if stratify is not None:
+        class_counts = y.value_counts()
+        rare_classes = class_counts[class_counts < 2]
+        if not rare_classes.empty:
+            logger.warning(
+                f"{len(rare_classes)} class(es) have fewer than 2 members "
+                f"(e.g. {list(rare_classes.index[:5])}) -- stratification is "
+                f"not possible for these; falling back to a non-stratified split."
+            )
+            stratify = None
+
     X_train, X_test, y_train, y_test = train_test_split(
-        X,
-        y,
-        test_size=TEST_SIZE,
-        random_state=RANDOM_STATE,
-        stratify=stratify,
+        X, y, test_size=TEST_SIZE, random_state=RANDOM_STATE, stratify=stratify,
     )
 
     logger.info(

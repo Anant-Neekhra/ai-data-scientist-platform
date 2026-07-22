@@ -37,7 +37,13 @@ def train_model(request: TrainRequest):
 
     df = df.dropna(subset=[request.target_column])
     problem_type = SchemaDetector().detect_problem_type(df, request.target_column)
-    X_train, X_test, y_train, y_test = split_dataset(df, target_col=request.target_column)
+    try:
+        X_train, X_test, y_train, y_test = split_dataset(df, target_col=request.target_column)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Could not split the dataset for target '{request.target_column}': {e}",
+        )
 
     # schema_override conversion MUST come before it's used below
     schema_override = None

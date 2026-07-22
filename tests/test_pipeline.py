@@ -153,3 +153,47 @@ def test_schema_override_takes_precedence_over_autodetection():
     # NOT one-hot expanded into multiple columns.
     assert "code" in result.columns
     assert list(result.columns) == ["code"]
+
+def test_schema_override_with_target_column_key_is_ignored():
+    """A schema_override built from the FULL uploaded dataset (as the
+    Streamlit Upload page does) can legitimately include an entry for
+    the target column. Since X never contains the target (already
+    dropped by split_dataset before reaching here), that key must be
+    silently ignored rather than causing FeatureGenerator to try
+    building an interaction feature against a column that doesn't
+    exist -- this reproduces the real KeyError hit via the Streamlit
+    Train page on a regression dataset."""
+    from ml_pipeline.data.schema_detector import FeatureType
+
+    X_train = pd.DataFrame(
+        {
+            "km_driven": [10000 + i * 500 for i in range(30)],
+            "brand": ["Honda", "Toyota", "Ford"] * 10,
+        }
+    )
+    # Override dict as it would arrive from the frontend: includes an
+    # entry for a column ('selling_price') that is NOT in X_train.
+    override = {
+        "km_driven": FeatureType.NUMERICAL,
+        "brand": FeatureType.CATEGORICAL,
+        "selling_price": FeatureType.NUMERICAL,  # the target -- not in X_train
+    }
+
+    pipeline = build_preprocessing_pipeline(X_train, schema_override=override)
+    pipeline.fit(X_train)
+    result = pipeline.transform(X_train)  # must not raise KeyError
+
+    assert "selling_price" not in result.columns
+    assert "km_driven_x_selling_price" not in result.columns
+
+def test_split_falls_back_to_unstratified_when_class_has_single_member():
+    df = pd.DataFrame(
+        {
+            "feature": range(20),
+            "target": ["common"] * 18 + ["common"] + ["rare_singleton"],
+        }
+    )
+    # 'rare_singleton' appears exactly once -- stratification is impossible.
+    # Must not raise; must fall back gracefully.
+    X_train, X_test, y_train, y_test = split_dataset(df, target_col="target")
+    assert len(X_train) + len(X_test) == 20
