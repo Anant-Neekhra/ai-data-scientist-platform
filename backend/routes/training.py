@@ -12,19 +12,11 @@ from ml_pipeline.tracking.mlflow_tracker import MLflowTracker
 from config.settings import DATASETS_DIR
 from backend.schemas import TrainRequest, TrainResponse
 from ml_pipeline.data.schema_detector import FeatureType
-from pydantic import BaseModel, Field
-import requests
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 router = APIRouter()
 _registry = ModelRegistry()
-
-class TrainRequest(BaseModel):
-    dataset_name: str
-    target_column: str
-    cv_folds: int = Field(5, ge=2, le=10)
-    schema_override: dict[str, str] | None = None
 
 @router.post("/train", response_model=TrainResponse)
 def train_model(request: TrainRequest):
@@ -46,6 +38,11 @@ def train_model(request: TrainRequest):
     df = df.dropna(subset=[request.target_column])
     problem_type = SchemaDetector().detect_problem_type(df, request.target_column)
     X_train, X_test, y_train, y_test = split_dataset(df, target_col=request.target_column)
+
+    # schema_override conversion MUST come before it's used below
+    schema_override = None
+    if request.schema_override:
+        schema_override = {col: FeatureType(val) for col, val in request.schema_override.items()}
 
     tracker = MLflowTracker()
     trainer = ModelTrainer(cv_folds=request.cv_folds)
@@ -72,10 +69,6 @@ def train_model(request: TrainRequest):
         feature_columns=list(X_train.columns),
         n_train_rows=len(X_train),
     )
-
-    schema_override = None
-    if request.schema_override:
-        schema_override = {col: FeatureType(val) for col, val in request.schema_override.items()}
 
     return TrainResponse(
         best_model_name=best_name,

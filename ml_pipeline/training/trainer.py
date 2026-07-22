@@ -56,6 +56,7 @@ class ModelTrainer:
         models: dict | None = None,
         tracker: MLflowTracker | None = None,
         dataset_name: str = "unknown",
+        schema_override: dict | None = None,
     ) -> list[ModelResult]:
         candidates = models if models is not None else get_candidate_models(problem_type)
         scoring = (
@@ -70,7 +71,7 @@ class ModelTrainer:
 
         results: list[ModelResult] = []
         for name, model in candidates.items():
-            full_pipeline = build_preprocessing_pipeline(X_train)
+            full_pipeline = build_preprocessing_pipeline(X_train, schema_override=schema_override)
             full_pipeline.steps.append(("model", model))
 
             start = time.time()
@@ -107,6 +108,7 @@ class ModelTrainer:
         results: list[ModelResult],
         problem_type: ProblemType,
         models: dict | None = None,
+        schema_override: dict | None = None,
     ) -> tuple[str, Pipeline]:
         """
         Pick the best-performing model from compare_models() results and
@@ -125,7 +127,7 @@ class ModelTrainer:
         candidates = models if models is not None else get_candidate_models(problem_type)
         best_model = candidates[best_result.model_name]
 
-        full_pipeline = build_preprocessing_pipeline(X_train)
+        full_pipeline = build_preprocessing_pipeline(X_train, schema_override=schema_override)
         full_pipeline.steps.append(("model", best_model))
         full_pipeline.fit(X_train, y_train)
 

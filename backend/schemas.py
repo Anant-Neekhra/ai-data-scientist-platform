@@ -34,12 +34,11 @@ class UploadResponse(BaseModel):
     validation_errors: list[str]
     validation_warnings: list[str]
 
-
 class TrainRequest(BaseModel):
     dataset_name: str
     target_column: str
     cv_folds: int = Field(5, ge=2, le=10)
-
+    schema_override: dict[str, str] | None = None
 
 class TrainResponse(BaseModel):
     best_model_name: str
