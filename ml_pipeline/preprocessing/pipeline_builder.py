@@ -22,33 +22,29 @@ logger = get_logger(__name__)
 
 
 def build_preprocessing_pipeline(
-    df: pd.DataFrame, scaling_method: str = "standard"
+    df: pd.DataFrame,
+    scaling_method: str = "standard",
+    schema_override: dict[str, FeatureType] | None = None,
 ) -> Pipeline:
     """
     Build a preprocessing Pipeline configured for this dataset's schema.
 
-    Order matters and is deliberate:
-      1. Impute missing values first -- later steps (encoding,
-         interaction features) shouldn't have to handle NaNs.
-      2. Engineer features next -- interaction terms should be built
-         from clean numeric data, and datetime decomposition removes
-         the raw datetime column before encoding would have to deal
-         with it.
-      3. Encode categoricals -- turns text into numeric columns.
-      4. Scale last -- scaling should apply to the FINAL set of
-         numeric columns, including any newly engineered interaction
-         features, not just the original raw ones.
-
     Args:
         df: a representative sample of the data (typically X_train)
-            used only to detect the schema that configures each step.
+            used to auto-detect the schema, UNLESS schema_override is
+            provided.
         scaling_method: 'standard' or 'minmax'.
+        schema_override: optional user-corrected schema (e.g. from the
+            Streamlit upload page's editable schema table). When
+            provided, this is used INSTEAD of auto-detection -- the
+            whole reason every transformer accepts an optional schema
+            parameter (since Day 5) is to make this override possible
+            without touching any transformer's internals.
 
     Returns:
-        An unfitted sklearn Pipeline. Call .fit(X_train) then
-        .transform(X_train) / .transform(X_test) — never fit twice.
+        An unfitted sklearn Pipeline.
     """
-    schema = SchemaDetector().detect_feature_types(df)
+    schema = schema_override or SchemaDetector().detect_feature_types(df)
 
     pipeline = Pipeline(
         steps=[
@@ -59,5 +55,8 @@ def build_preprocessing_pipeline(
             ("scaler", FeatureScaler(method=scaling_method, schema=schema)),
         ]
     )
-    logger.info(f"Built preprocessing pipeline with schema: {schema}")
+    logger.info(
+        f"Built preprocessing pipeline with schema: {schema} "
+        f"(override={'yes' if schema_override else 'no'})"
+    )
     return pipeline

@@ -137,3 +137,19 @@ def test_full_pipeline_runs_end_to_end_without_leakage():
             pd.api.types.is_numeric_dtype(X_train_transformed[col])
             for col in X_train_transformed.columns
         )
+
+def test_schema_override_takes_precedence_over_autodetection():
+    from ml_pipeline.data.schema_detector import FeatureType
+
+    # A column that would auto-detect as categorical (low cardinality)
+    df = pd.DataFrame({"code": [1, 2, 3, 1, 2, 3, 1, 2, 3, 1] * 3})
+    override = {"code": FeatureType.NUMERICAL}
+
+    pipeline = build_preprocessing_pipeline(df, schema_override=override)
+    pipeline.fit(df)
+    result = pipeline.transform(df)
+
+    # Under override, 'code' is treated as numerical -> scaled in place,
+    # NOT one-hot expanded into multiple columns.
+    assert "code" in result.columns
+    assert list(result.columns) == ["code"]

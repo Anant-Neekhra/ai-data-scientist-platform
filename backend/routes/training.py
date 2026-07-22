@@ -11,12 +11,20 @@ from ml_pipeline.registry.model_registry import ModelRegistry
 from ml_pipeline.tracking.mlflow_tracker import MLflowTracker
 from config.settings import DATASETS_DIR
 from backend.schemas import TrainRequest, TrainResponse
+from ml_pipeline.data.schema_detector import FeatureType
+from pydantic import BaseModel, Field
+import requests
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 router = APIRouter()
 _registry = ModelRegistry()
 
+class TrainRequest(BaseModel):
+    dataset_name: str
+    target_column: str
+    cv_folds: int = Field(5, ge=2, le=10)
+    schema_override: dict[str, str] | None = None
 
 @router.post("/train", response_model=TrainResponse)
 def train_model(request: TrainRequest):
@@ -42,12 +50,15 @@ def train_model(request: TrainRequest):
     tracker = MLflowTracker()
     trainer = ModelTrainer(cv_folds=request.cv_folds)
     results = trainer.compare_models(
-        X_train, y_train, problem_type, tracker=tracker, dataset_name=request.dataset_name
+        X_train, y_train, problem_type, tracker=tracker,
+        dataset_name=request.dataset_name, schema_override=schema_override,
     )
     if not results:
         raise HTTPException(status_code=500, detail="All candidate models failed to train.")
 
-    best_name, fitted_pipeline = trainer.fit_best_model(X_train, y_train, results, problem_type)
+    best_name, fitted_pipeline = trainer.fit_best_model(
+        X_train, y_train, results, problem_type, schema_override=schema_override
+    )
     leaderboard = build_leaderboard(results, problem_type)
 
     test_score = fitted_pipeline.score(X_test, y_test)
@@ -61,6 +72,10 @@ def train_model(request: TrainRequest):
         feature_columns=list(X_train.columns),
         n_train_rows=len(X_train),
     )
+
+    schema_override = None
+    if request.schema_override:
+        schema_override = {col: FeatureType(val) for col, val in request.schema_override.items()}
 
     return TrainResponse(
         best_model_name=best_name,
