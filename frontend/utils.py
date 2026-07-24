@@ -35,3 +35,8 @@ def predict_batch(dataset_name: str, file) -> bytes:
     )
     response.raise_for_status()
     return response.content
+
+def list_trained_datasets() -> list[str]:
+    response = requests.get(f"{API_BASE}/models")
+    response.raise_for_status()
+    return response.json()["datasets"]

@@ -81,3 +81,8 @@ def train_model(request: TrainRequest):
         leaderboard=leaderboard.to_dict(orient="records"),
         model_version=metadata.version,
     )
+
+@router.get("/models")
+def list_trained_models():
+    """List every dataset that currently has at least one saved model."""
+    return {"datasets": _registry.list_datasets()}

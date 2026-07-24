@@ -152,3 +152,21 @@ def test_delete_version_falls_back_to_newest_remaining(registry, fitted_pipeline
     assert meta.version == 1
     remaining = registry.list_versions("titanic.csv")
     assert len(remaining) == 1
+
+def test_list_datasets_returns_only_datasets_with_saved_models(registry, fitted_pipeline):
+    pipeline, X, y = fitted_pipeline
+    registry.save_model(
+        pipeline, "titanic.csv", "logistic_regression", "classification",
+        {"accuracy": 0.8}, {}, list(X.columns), len(X),
+    )
+    registry.save_model(
+        pipeline, "housing.csv", "logistic_regression", "classification",
+        {"accuracy": 0.7}, {}, list(X.columns), len(X),
+    )
+
+    datasets = registry.list_datasets()
+    assert datasets == ["housing", "titanic"]  # sorted, sanitized names
+
+
+def test_list_datasets_empty_when_none_saved(registry):
+    assert registry.list_datasets() == []

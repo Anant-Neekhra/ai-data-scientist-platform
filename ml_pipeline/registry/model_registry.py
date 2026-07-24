@@ -230,3 +230,18 @@ class ModelRegistry:
             index["current_best"] = max((v["version"] for v in index["versions"]), default=None)
         self._save_index(dataset_name, index)
         logger.info(f"Deleted version {version} for dataset '{dataset_name}'")
+
+    def list_datasets(self) -> list[str]:
+        """
+        List every dataset that has at least one saved model. Returns
+        the SANITIZED folder names (not the original filenames) --
+        good enough for populating a selection dropdown, since a
+        dataset only needs to be re-identifiable, not perfectly
+        reconstructed to its original filename.
+        """
+        if not self.base_dir.exists():
+            return []
+        return sorted(
+            d.name for d in self.base_dir.iterdir()
+            if d.is_dir() and (d / "registry.json").exists()
+        )
